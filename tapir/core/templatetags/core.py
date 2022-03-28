@@ -12,7 +12,6 @@ register = template.Library()
 
 @register.simple_tag
 def is_app_installed(app):
-    print(f"IS APP INSTALLED : {app} : {apps.is_installed(app)}")
     return apps.is_installed(app)
 
 
