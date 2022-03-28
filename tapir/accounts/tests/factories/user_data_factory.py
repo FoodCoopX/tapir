@@ -12,7 +12,10 @@ class CustomPhoneProvider(Provider):
         tries = 0
         while tries < 10:
             phone_number = self.numerify(self.random_element(self.formats))
-            parsed_number = phonenumbers.parse(phone_number, "DE")
+            try:
+                parsed_number = phonenumbers.parse(phone_number, "DE")
+            except phonenumbers.phonenumberutil.NumberParseException:
+                continue
             if phonenumbers.is_valid_number(parsed_number):
                 return phonenumbers.format_number(
                     parsed_number, phonenumbers.PhoneNumberFormat.E164

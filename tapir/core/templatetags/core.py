@@ -1,12 +1,19 @@
 from django import template
+from django.apps import apps
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
+import tapir
 from tapir.coop.models import FinancingCampaign
 from tapir.core.models import SidebarLinkGroup
-from tapir.shifts.templatetags.shifts import get_current_week_group
 
 register = template.Library()
+
+
+@register.simple_tag
+def is_app_installed(app):
+    print(f"IS APP INSTALLED : {app} : {apps.is_installed(app)}")
+    return apps.is_installed(app)
 
 
 @register.inclusion_tag("core/sidebar_links.html", takes_context=True)
@@ -59,50 +66,8 @@ def get_sidebar_link_groups(request):
         )
         groups.append(welcomedesk_group)
 
-    current_week_group_name = "???"
-    current_week_group = get_current_week_group()
-    if current_week_group is not None:
-        current_week_group_name = current_week_group.name
-
-    shifts_group = SidebarLinkGroup(name=_("Shifts"))
-    groups.append(shifts_group)
-    shifts_group.add_link(
-        display_name=_("Shift calendar"),
-        material_icon="calendar_today",
-        url=reverse_lazy("shifts:calendar_future"),
-    )
-    shifts_group.add_link(
-        display_name=_("ABCD-shifts week-plan"),
-        material_icon="today",
-        url=reverse_lazy("shifts:shift_template_overview"),
-    )
-    shifts_group.add_link(
-        display_name=_(f"ABCD weeks calendar, current week: {current_week_group_name}"),
-        material_icon="table_view",
-        url=reverse_lazy("shifts:shift_template_group_calendar"),
-    )
-
-    if request.user.has_perm("shifts.manage"):
-        shifts_group.add_link(
-            display_name=_("Past shifts"),
-            material_icon="history",
-            url=reverse_lazy("shifts:calendar_past"),
-        )
-        shifts_group.add_link(
-            display_name=_("Shift exemptions"),
-            material_icon="beach_access",
-            url=reverse_lazy("shifts:shift_exemption_list"),
-        )
-        shifts_group.add_link(
-            display_name=_("Shift statistics"),
-            material_icon="calculate",
-            url=reverse_lazy("shifts:statistics"),
-        )
-        shifts_group.add_link(
-            display_name=_("Members on alert"),
-            material_icon="priority_high",
-            url=reverse_lazy("shifts:members_on_alert"),
-        )
+    if apps.is_installed("tapir.shifts"):
+        groups += tapir.shifts.templatetags.shifts.get_sidebar_link_groups(request)
 
     if FinancingCampaign.objects.exists():
         campaign_group = SidebarLinkGroup(name=_("Financing campaign"))

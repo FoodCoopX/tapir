@@ -1,10 +1,9 @@
 import datetime
 
+from django.apps import apps
 from django.conf import settings
 from django.utils import timezone
 from django.utils.deprecation import MiddlewareMixin
-
-from tapir.shifts.models import Shift, ShiftAttendance
 
 
 class ClientPermsMiddleware(MiddlewareMixin):
@@ -22,6 +21,11 @@ class ClientPermsMiddleware(MiddlewareMixin):
                 request.META["HTTP_X_SSL_CLIENT_S_DN"]
             ]
             return
+
+        if not apps.is_installed("tapir.shifts"):
+            return
+
+        from tapir.shifts.models import Shift, ShiftAttendance
 
         current_shifts = Shift.objects.filter(
             start_time__lt=timezone.now() + datetime.timedelta(minutes=20),

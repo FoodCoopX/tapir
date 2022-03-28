@@ -2,14 +2,13 @@ from django.test import Client
 from django.urls import reverse
 
 from tapir.accounts.models import TapirUser
-from tapir.accounts.tests.factories.factories import TapirUserFactory
 from tapir.utils.tests_utils import TapirFactoryTestBase
 
 
 class AccountsStandardUserDetailPage(TapirFactoryTestBase):
     def test_standard_user_detail_page(self):
         client = Client()
-        user: TapirUser = TapirUserFactory.create()
+        user: TapirUser = self.get_tapir_user_factory().create()
         self.assertTrue(client.login(username=user.username, password=user.username))
         response = client.get(reverse("accounts:user_me"), follow=True)
         self.assertEqual(

@@ -3,6 +3,7 @@ import math
 
 import factory
 
+from tapir.accounts.tests.factories.factories import TapirUserFactory
 from tapir.shifts.models import (
     ShiftTemplate,
     WEEKDAY_CHOICES,
@@ -84,3 +85,13 @@ class ShiftFactory(factory.django.DjangoModelFactory):
             ShiftSlotFactory.create(shift=self)
         self.num_required_attendances = math.ceil(nb_slots / 2)
         self.save()
+
+
+class TapirUserWithShiftsFactoryMixin(factory.django.DjangoModelFactory):
+    @factory.post_generation
+    def shift_capabilities(self, create, shift_capabilities, **kwargs):
+        if not create:
+            return
+
+        self.shift_user_data.capabilities = shift_capabilities or []
+        self.shift_user_data.save()

@@ -3,7 +3,6 @@ import datetime
 from django.urls import reverse
 
 from tapir.accounts.models import TapirUser
-from tapir.accounts.tests.factories.factories import TapirUserFactory
 from tapir.shifts.models import (
     ShiftSlot,
     ShiftAttendance,
@@ -23,7 +22,7 @@ class TestAttendanceUpdateMemberOffice(TapirFactoryTestBase):
         self.do_test(ShiftAttendance.State.MISSED, -1)
 
     def test_update_from_missed_to_attended(self):
-        user: TapirUser = TapirUserFactory.create()
+        user: TapirUser = self.get_tapir_user_factory().create()
         shift = ShiftFactory.create()
         attendance = ShiftAttendance.objects.create(
             user=user, slot=ShiftSlot.objects.filter(shift=shift).first()
@@ -39,7 +38,7 @@ class TestAttendanceUpdateMemberOffice(TapirFactoryTestBase):
         )
 
     def test_create_manual_shift_account_entry(self):
-        user = TapirUserFactory.create()
+        user = self.get_tapir_user_factory().create()
         self.login_as_member_office_user()
         response = self.client.post(
             reverse("shifts:create_shift_account_entry", args=[user.id]),
@@ -61,7 +60,7 @@ class TestAttendanceUpdateMemberOffice(TapirFactoryTestBase):
         )
 
     def do_test(self, target_state, expected_account_balance):
-        user: TapirUser = TapirUserFactory.create()
+        user: TapirUser = self.get_tapir_user_factory().create()
         shift = ShiftFactory.create()
         attendance = ShiftAttendance.objects.create(
             user=user, slot=ShiftSlot.objects.filter(shift=shift).first()

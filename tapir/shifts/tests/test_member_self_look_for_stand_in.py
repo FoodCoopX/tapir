@@ -4,7 +4,6 @@ from django.core import mail
 from django.urls import reverse
 from django.utils import timezone
 
-from tapir.accounts.tests.factories.factories import TapirUserFactory
 from tapir.shifts.models import (
     ShiftSlot,
     ShiftAttendance,
@@ -61,7 +60,7 @@ class TestMemberSelfLookForStandIn(TapirFactoryTestBase):
         )
 
     def test_stand_in_found(self):
-        user_looking = TapirUserFactory.create()
+        user_looking = self.get_tapir_user_factory().create()
         start_time = timezone.now() + datetime.timedelta(days=1)
         shift = ShiftFactory.create(start_time=start_time)
         slot = ShiftSlot.objects.filter(shift=shift).first()

@@ -13,6 +13,7 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+from django.apps import apps
 from django.conf import settings
 from django.conf.urls import url
 from django.conf.urls.static import static
@@ -26,10 +27,12 @@ urlpatterns = [
     path("", generic.RedirectView.as_view(pattern_name="accounts:index")),
     path("admin/", admin.site.urls),
     path("accounts/", include("tapir.accounts.urls")),
-    path("shifts/", include("tapir.shifts.urls")),
     path("coop/", include("tapir.coop.urls")),
     path("log/", include("tapir.log.urls")),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+
+if apps.is_installed("tapir.shifts"):
+    urlpatterns.append(path("shifts/", include("tapir.shifts.urls")))
 
 if ENABLE_SILK_PROFILING:
     urlpatterns += [url(r"^silk/", include("silk.urls", namespace="silk"))]

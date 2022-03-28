@@ -1,5 +1,6 @@
 from datetime import datetime
 
+import django_filters
 import django_tables2
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
@@ -16,10 +17,12 @@ from django.views.generic import (
     UpdateView,
 )
 from django.views.generic import DetailView, TemplateView
+from django_filters import ChoiceFilter
 from django_tables2 import SingleTableView
 from django_tables2.export import ExportMixin
 
 from tapir.accounts.models import TapirUser
+from tapir.coop.models import ShareOwner
 from tapir.log.util import freeze_for_log
 from tapir.shifts.forms import (
     ShiftCreateForm,
@@ -31,6 +34,7 @@ from tapir.shifts.models import (
     ShiftAttendance,
     SHIFT_ATTENDANCE_STATES,
     ShiftTemplate,
+    SHIFT_USER_CAPABILITY_CHOICES,
 )
 from tapir.shifts.models import (
     ShiftSlot,
@@ -268,4 +272,74 @@ class MembersOnAlertView(PermissionRequiredMixin, ExportMixin, SingleTableView):
             .annotate(account_balance=Sum("user__shift_account_entries__value"))
             .filter(account_balance__lt=-1)
             .order_by("user__date_joined")
+        )
+
+
+class ShareOwnerFilterWithShiftsMixin(django_filters.FilterSet):
+    shift_attendance_mode = ChoiceFilter(
+        choices=ShiftUserData.SHIFT_ATTENDANCE_MODE_CHOICES,
+        method="shift_attendance_mode_filter",
+        label=_("Shift Status"),
+    )
+    registered_to_slot_with_capability = ChoiceFilter(
+        choices=[
+            (capability, capability_name)
+            for capability, capability_name in SHIFT_USER_CAPABILITY_CHOICES.items()
+        ],
+        method="registered_to_slot_with_capability_filter",
+        label=_("Is registered to a slot that requires a qualification"),
+    )
+    has_capability = ChoiceFilter(
+        choices=[
+            (capability, capability_name)
+            for capability, capability_name in SHIFT_USER_CAPABILITY_CHOICES.items()
+        ],
+        method="has_capability_filter",
+        label=_("Has qualification"),
+    )
+    not_has_capability = ChoiceFilter(
+        choices=[
+            (capability, capability_name)
+            for capability, capability_name in SHIFT_USER_CAPABILITY_CHOICES.items()
+        ],
+        method="not_has_capability_filter",
+        label=_("Does not have qualification"),
+    )
+    # Théo 17.09.21 : It would be nicer to get the values from the DB, but that raises exceptions
+    # when creating a brand new docker instance, because the corresponding table doesn't exist yet.
+    abcd_week = ChoiceFilter(
+        choices=[("A", "A"), ("B", "B"), ("C", "C"), ("D", "D")],
+        method="abcd_week_filter",
+        label=_("ABCD Week"),
+    )
+
+    def shift_attendance_mode_filter(
+        self, queryset: ShareOwner.ShareOwnerQuerySet, name, value: str
+    ):
+        return queryset.filter(
+            user__in=TapirUser.objects.with_shift_attendance_mode(value)
+        )
+
+    def registered_to_slot_with_capability_filter(
+        self, queryset: ShareOwner.ShareOwnerQuerySet, name, value: str
+    ):
+        return queryset.filter(
+            user__in=TapirUser.objects.registered_to_shift_slot_with_capability(value)
+        )
+
+    def has_capability_filter(
+        self, queryset: ShareOwner.ShareOwnerQuerySet, name, value: str
+    ):
+        return queryset.filter(user__in=TapirUser.objects.has_capability(value))
+
+    def not_has_capability_filter(
+        self, queryset: ShareOwner.ShareOwnerQuerySet, name, value: str
+    ):
+        return queryset.exclude(user__in=TapirUser.objects.has_capability(value))
+
+    def abcd_week_filter(
+        self, queryset: ShareOwner.ShareOwnerQuerySet, name, value: str
+    ):
+        return queryset.filter(
+            user__shift_attendance_templates__slot_template__shift_template__group__name=value
         )

@@ -1,6 +1,6 @@
 from django.test import tag
 
-from tapir.utils.tests_utils import TapirSeleniumTestBase
+from tapir.utils.tests_utils import TapirSeleniumTestBase, TapirFactoryTestBase
 
 
 class AccountsIntegrationTests(TapirSeleniumTestBase):
@@ -8,7 +8,8 @@ class AccountsIntegrationTests(TapirSeleniumTestBase):
     def test_login_as_admin(self):
         self.selenium.get(self.live_server_url)
         self.logout_if_necessary()
-        self.login_as_admin()
+        user = TapirFactoryTestBase.get_tapir_user_factory().create()
+        self.login(user.username, user.username)
         self.assertIsNotNone(self.selenium.find_element_by_id("logout"))
 
     @tag("selenium")

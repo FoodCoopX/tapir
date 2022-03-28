@@ -2,7 +2,6 @@ import datetime
 
 from django.urls import reverse
 
-from tapir.accounts.tests.factories.factories import TapirUserFactory
 from tapir.shifts.models import (
     ShiftExemption,
     ShiftAttendance,
@@ -18,14 +17,14 @@ class TestExemptions(TapirFactoryTestBase):
     SECOND_CYCLE_START_DATE = datetime.date(day=15, month=2, year=2021)
 
     def test_no_exemption(self):
-        user = TapirUserFactory.create()
+        user = self.get_tapir_user_factory().create()
         self.assertFalse(
             user.shift_user_data.is_currently_exempted_from_shifts(),
             "A newly created user should not be exempted from shifts.",
         )
 
     def test_active_exemption(self):
-        user = TapirUserFactory.create()
+        user = self.get_tapir_user_factory().create()
         self.create_exemption(
             user=user,
             start_date=datetime.date.today() - datetime.timedelta(days=7),
@@ -44,7 +43,7 @@ class TestExemptions(TapirFactoryTestBase):
         )
 
     def test_past_exemption(self):
-        user = TapirUserFactory.create()
+        user = self.get_tapir_user_factory().create()
         self.create_exemption(
             user=user,
             start_date=datetime.date.today() - datetime.timedelta(days=120),
@@ -59,7 +58,7 @@ class TestExemptions(TapirFactoryTestBase):
         )
 
     def test_past_exemption_no_end_date(self):
-        user = TapirUserFactory.create()
+        user = self.get_tapir_user_factory().create()
         self.create_exemption(
             user=user,
             start_date=datetime.date.today() - datetime.timedelta(days=120),
@@ -74,7 +73,7 @@ class TestExemptions(TapirFactoryTestBase):
         )
 
     def test_future_exemption(self):
-        user = TapirUserFactory.create()
+        user = self.get_tapir_user_factory().create()
         self.create_exemption(
             user=user,
             start_date=datetime.date.today() + datetime.timedelta(days=30),
@@ -89,7 +88,7 @@ class TestExemptions(TapirFactoryTestBase):
         )
 
     def test_attendance_cancelled_during_short_exemption(self):
-        user = TapirUserFactory.create()
+        user = self.get_tapir_user_factory().create()
         shift_template = ShiftTemplateFactory.create()
         shift_cancelled = shift_template.create_shift(
             start_date=datetime.date.today() + datetime.timedelta(days=1)
@@ -153,7 +152,7 @@ class TestExemptions(TapirFactoryTestBase):
         self.do_long_exemption_test(end_date=None)
 
     def do_long_exemption_test(self, end_date):
-        user = TapirUserFactory.create()
+        user = self.get_tapir_user_factory().create()
         shift_template = ShiftTemplateFactory.create()
         shift_kept = shift_template.create_shift(
             start_date=datetime.date.today() + datetime.timedelta(days=1)

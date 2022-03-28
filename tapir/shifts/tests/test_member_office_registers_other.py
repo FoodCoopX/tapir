@@ -2,7 +2,6 @@ import datetime
 
 from django.urls import reverse
 
-from tapir.accounts.tests.factories.factories import TapirUserFactory
 from tapir.shifts.models import (
     ShiftSlot,
     ShiftUserCapability,
@@ -22,7 +21,7 @@ from tapir.utils.tests_utils import TapirFactoryTestBase
 
 class TestMemberRegistersOther(TapirFactoryTestBase):
     def test_member_registers_other_flying(self):
-        user = TapirUserFactory.create()
+        user = self.get_tapir_user_factory().create()
         shift = ShiftFactory.create()
 
         self.login_as_member_office_user()
@@ -30,7 +29,7 @@ class TestMemberRegistersOther(TapirFactoryTestBase):
         check_registration_successful(self, response, user, shift)
 
     def test_member_registers_other_flying_warning_no_capability(self):
-        user = TapirUserFactory.create()
+        user = self.get_tapir_user_factory().create()
         shift = ShiftFactory.create()
         slot = ShiftSlot.objects.filter(shift=shift).first()
         slot.required_capabilities = [ShiftUserCapability.CASHIER]
@@ -57,7 +56,7 @@ class TestMemberRegistersOther(TapirFactoryTestBase):
         check_registration_successful(self, response, user, shift)
 
     def test_member_registers_other_abcd(self):
-        user = TapirUserFactory.create()
+        user = self.get_tapir_user_factory().create()
         shift_template = ShiftTemplateFactory.create()
         shift_1 = shift_template.create_shift(
             start_date=datetime.date.today() + datetime.timedelta(days=1)
@@ -84,7 +83,7 @@ class TestMemberRegistersOther(TapirFactoryTestBase):
         )
 
     def test_member_registers_other_abcd_warning_missing_capability(self):
-        user = TapirUserFactory.create()
+        user = self.get_tapir_user_factory().create()
         shift_template = ShiftTemplateFactory.create()
         slot_template = ShiftSlotTemplate.objects.filter(
             shift_template=shift_template
@@ -112,8 +111,8 @@ class TestMemberRegistersOther(TapirFactoryTestBase):
         check_registration_successful_template(self, response, user, shift_template)
 
     def test_member_registers_other_warning_occupied(self):
-        abcd_user = TapirUserFactory.create()
-        flying_user = TapirUserFactory.create()
+        abcd_user = self.get_tapir_user_factory().create()
+        flying_user = self.get_tapir_user_factory().create()
         shift_template = ShiftTemplateFactory.create()
 
         shift_free = shift_template.create_shift(
@@ -161,7 +160,7 @@ class TestMemberRegistersOther(TapirFactoryTestBase):
         )
 
     def test_member_registers_after_unregister(self):
-        user = TapirUserFactory.create()
+        user = self.get_tapir_user_factory().create()
         shift_template = ShiftTemplateFactory.create()
         shift = shift_template.create_shift(
             start_date=datetime.date.today() + datetime.timedelta(days=1)

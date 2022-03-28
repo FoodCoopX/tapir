@@ -51,7 +51,7 @@ INSTALLED_APPS = [
     "django_bootstrap5",
     "tapir.core",
     "tapir.log",
-    "tapir.shifts",
+    # "tapir.shifts",
     "tapir.utils",
     "tapir.coop",
     "tapir.odoo",

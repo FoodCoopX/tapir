@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.apps import apps
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
@@ -10,7 +11,6 @@ from phonenumber_field.modelfields import PhoneNumberField
 from tapir import utils
 from tapir.accounts.models import TapirUser
 from tapir.log.models import UpdateModelLogEntry, ModelLogEntry
-from tapir.shifts.models import ShiftAttendanceTemplate
 from tapir.utils.models import (
     DurationModelMixin,
     CountryField,
@@ -179,11 +179,19 @@ class ShareOwner(models.Model):
         return MemberStatus.ACTIVE
 
     def can_shop(self):
-        return (
-            self.user is not None
-            and self.user.shift_user_data.is_balance_ok()
-            and self.is_active()
-        )
+        if self.user is None:
+            return False
+
+        if not self.is_active():
+            return False
+
+        if (
+            apps.is_installed("tapir.shifts")
+            and not self.user.shift_user_data.is_balance_ok()
+        ):
+            return False
+
+        return True
 
     def is_active(self) -> bool:
         return self.get_member_status() == MemberStatus.ACTIVE

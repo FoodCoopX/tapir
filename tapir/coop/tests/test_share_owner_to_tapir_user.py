@@ -1,7 +1,6 @@
 from django.urls import reverse
 
 from tapir.accounts.models import TapirUser
-from tapir.accounts.tests.factories.factories import TapirUserFactory
 from tapir.accounts.tests.factories.user_data_factory import UserDataFactory
 from tapir.coop.models import ShareOwner
 from tapir.coop.tests.factories import ShareOwnerFactory
@@ -74,7 +73,7 @@ class TestsShareOwnerToTapirUser(TapirFactoryTestBase):
         )
 
     def test_cant_create_user_already_exists(self):
-        tapir_user = TapirUserFactory.create()
+        tapir_user = self.get_tapir_user_factory().create()
         self.login_as_member_office_user()
         response = self.visit_create_user_view(tapir_user.share_owner)
 

@@ -1,7 +1,6 @@
 import datetime
 
 from tapir.accounts.models import TapirUser
-from tapir.accounts.tests.factories.factories import TapirUserFactory
 from tapir.shifts.models import (
     ShiftCycleEntry,
     ShiftExemption,
@@ -103,7 +102,7 @@ class TestShiftCycle(TapirFactoryTestBase):
         )
 
     def test_user_joined_after_cycle_start(self):
-        user = TapirUserFactory.create(
+        user = self.get_tapir_user_factory().create(
             share_owner__is_investing=False,
             date_joined=self.FIRST_CYCLE_START_DATE + datetime.timedelta(days=7),
         )
@@ -116,7 +115,7 @@ class TestShiftCycle(TapirFactoryTestBase):
         )
 
     def get_user_that_joined_before_first_cycle(self) -> TapirUser:
-        return TapirUserFactory.create(
+        return self.get_tapir_user_factory().create(
             share_owner__is_investing=False,
             date_joined=self.FIRST_CYCLE_START_DATE - datetime.timedelta(days=7),
         )

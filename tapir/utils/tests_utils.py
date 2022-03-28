@@ -1,10 +1,7 @@
-import datetime
-import json
-import os
-import pathlib
 import socket
 
 import factory.random
+from django.apps import apps
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.db import DEFAULT_DB_ALIAS
 from django.test import TestCase, override_settings, Client
@@ -13,26 +10,25 @@ from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver import DesiredCapabilities
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.firefox.webdriver import WebDriver
-from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import WebDriverWait
 
+import tapir
 from tapir.accounts.models import TapirUser
 from tapir.accounts.templatetags.accounts import format_phone_number
 from tapir.accounts.tests.factories.factories import TapirUserFactory
 from tapir.utils.json_user import JsonUser
 
-TAPIR_SELENIUM_BASE_FIXTURES = ["admin_account.json", "test_data.json"]
+
+class LdapEnabledTestCase(TestCase):
+    databases = {"ldap", DEFAULT_DB_ALIAS}
 
 
 @override_settings(ALLOWED_HOSTS=["*"])
-class TapirSeleniumTestBase(StaticLiveServerTestCase):
+class TapirSeleniumTestBase(LdapEnabledTestCase, StaticLiveServerTestCase):
     DEFAULT_TIMEOUT = 5
     selenium: WebDriver
-    test_users: [] = None
-    fixtures = TAPIR_SELENIUM_BASE_FIXTURES
     host = "0.0.0.0"  # Bind to 0.0.0.0 to allow external access
 
     @classmethod
@@ -51,6 +47,10 @@ class TapirSeleniumTestBase(StaticLiveServerTestCase):
         cls.selenium.quit()
         super().tearDownClass()
 
+    def setUp(self) -> None:
+        super().setUp()
+        factory.random.reseed_random(self.__class__.__name__)
+
     def login(self, username: str, password: str):
         self.selenium.get(self.live_server_url + reverse("login"))
         login_card = self.selenium.find_element_by_id("login-card")
@@ -58,38 +58,6 @@ class TapirSeleniumTestBase(StaticLiveServerTestCase):
         login_card.find_element_by_id("id_password").send_keys(password)
         login_card.find_element_by_tag_name("button").click()
         self.wait_until_element_present_by_id("logout")
-
-    def login_as_admin(self):
-        self.login("admin", "admin")
-
-    def get_test_user(self, searched_username: str) -> JsonUser:
-        if self.test_users is None:
-            path_to_json_file = os.path.join(
-                pathlib.Path(__file__).parent.absolute(),
-                "management",
-                "commands",
-                "test_users.json",
-            )
-            file = open(path_to_json_file, encoding="UTF-8")
-            json_string = file.read()
-            file.close()
-            self.test_users = json.loads(json_string)["results"]
-
-        for parsed_user in self.test_users:
-            json_user = JsonUser(parsed_user)
-            if json_user.get_username() == searched_username:
-                return json_user
-
-        raise Exception("No test user found")
-
-    def get_vorstand_user(self) -> JsonUser:
-        return self.get_test_user("ariana.perrin")
-
-    def get_member_office_user(self) -> JsonUser:
-        return self.get_test_user("roberto.cortes")
-
-    def get_standard_user(self) -> JsonUser:
-        return self.get_test_user("nicolas.vicente")
 
     def logout_if_necessary(self):
         url_before = self.selenium.current_url
@@ -132,27 +100,6 @@ class TapirSeleniumTestBase(StaticLiveServerTestCase):
         except TimeoutException:
             self.fail("Missing element with class " + html_class)
 
-    def go_to_user_page(self, user_display_name: str):
-        self.selenium.get(self.live_server_url + reverse("coop:shareowner_list"))
-
-        member_search = self.selenium.find_element_by_id("member_search")
-        member_search.send_keys(user_display_name)
-        member_search.send_keys(Keys.ENTER)
-
-        self.wait_until_element_present_by_id("user_coop_info_card")
-
-    @staticmethod
-    def is_button_disabled(button: WebElement):
-        return "disabled" in button.get_attribute("class")
-
-    def fill_date_field(self, element_id, date: datetime.date):
-        # Somehow send_keys doesn't work for <input type="date"> in Firefox
-        self.selenium.execute_script(
-            f"document.getElementById('{element_id}').value = '"
-            + date.strftime("%Y-%m-%d")
-            + "';"
-        )
-
 
 class TapirUserTestBase(TapirSeleniumTestBase):
     def check_tapir_user_details(self, user: JsonUser):
@@ -190,14 +137,11 @@ class TapirUserTestBase(TapirSeleniumTestBase):
         )
 
 
-class LdapEnabledTestCase(TestCase):
-    databases = {"ldap", DEFAULT_DB_ALIAS}
-
-
 class TapirFactoryTestBase(LdapEnabledTestCase):
     client: Client
 
     def setUp(self) -> None:
+        super().setUp()
         factory.random.reseed_random(self.__class__.__name__)
         self.client = Client()
 
@@ -206,11 +150,19 @@ class TapirFactoryTestBase(LdapEnabledTestCase):
         self.assertTrue(success, f"User {user.username} should be able to log in.")
 
     def login_as_member_office_user(self) -> TapirUser:
-        user = TapirUserFactory.create(is_in_member_office=True)
+        user = self.get_tapir_user_factory().create(is_in_member_office=True)
         self.login_as_user(user)
         return user
 
     def login_as_normal_user(self) -> TapirUser:
-        user = TapirUserFactory.create(is_in_member_office=False)
+        user = self.get_tapir_user_factory().create(is_in_member_office=False)
         self.login_as_user(user)
         return user
+
+    @staticmethod
+    def get_tapir_user_factory():
+        mixins = [TapirUserFactory]
+        if apps.is_installed("tapir.shifts"):
+            mixins.append(tapir.shifts.tests.factories.TapirUserWithShiftsFactoryMixin)
+
+        return type("CustomTapirUserFactory", tuple(mixins), {})

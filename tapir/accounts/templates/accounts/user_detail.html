@@ -3,14 +3,13 @@
 {% load django_bootstrap5 %}
 {% load static %}
 {% load i18n %}
-{% load shifts %}
 {% load coop %}
 {% load log %}
 {% load accounts %}
+{% load core %}
 
 {% block head %}
     {{ block.super }}
-    <link rel="stylesheet" href="{% static "shifts/css/shifts.css" %}">
     <link rel="stylesheet" href="{% static "accounts/css/user_detail.css" %}">
 {% endblock %}
 
@@ -105,9 +104,17 @@
             {% share_owner_ownership_list object.share_owner %}
         </div>
 
-        <div class="col-6 p-0">
-            {% user_shifts_overview object %}
-        </div>
+        {% is_app_installed "tapir.shifts" as is_shifts_app_installed %}
+        {% if is_shifts_app_installed %}
+            <div class="col-6 p-0">
+                {% comment %}
+                    We need to wrap the template_tag that's in the shifts app in an include,
+                    otherwise Django complains about the template not being installed
+                    even though it's inside the if block
+                {% endcomment %}
+                {% include "shifts/shift_card_wrapper.html" %}
+            </div>
+        {% endif %}
 
         <div class="col-12 p-0">
             {% user_log_entry_list object %}

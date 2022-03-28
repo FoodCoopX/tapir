@@ -3,6 +3,7 @@ from datetime import date
 
 import django_filters
 import django_tables2
+from django.apps import apps
 from django.contrib import messages
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.mixins import PermissionRequiredMixin
@@ -24,6 +25,7 @@ from django_filters.views import FilterView
 from django_tables2 import SingleTableView
 from django_tables2.export import ExportMixin
 
+import tapir
 from tapir import settings
 from tapir.accounts.models import TapirUser
 from tapir.coop import pdfs
@@ -45,12 +47,6 @@ from tapir.log.models import EmailLogEntry, LogEntry
 from tapir.log.util import freeze_for_log
 from tapir.log.views import UpdateViewLogMixin
 from tapir.settings import FROM_EMAIL_MEMBER_OFFICE
-from tapir.shifts.models import (
-    ShiftUserData,
-    SHIFT_USER_CAPABILITY_CHOICES,
-    ShiftAttendanceTemplate,
-    ShiftAttendanceMode,
-)
 from tapir.utils.models import copy_user_info
 
 
@@ -367,7 +363,7 @@ class ShareOwnerTable(django_tables2.Table):
         return record.get_info().preferred_language
 
 
-class ShareOwnerFilter(django_filters.FilterSet):
+class ShareOwnerBaseFilter(django_filters.FilterSet):
     class Meta:
         model = ShareOwner
         fields = [
@@ -383,49 +379,12 @@ class ShareOwnerFilter(django_filters.FilterSet):
         label=_("Status"),
         empty_label=_("Any"),
     )
-    shift_attendance_mode = ChoiceFilter(
-        choices=ShiftUserData.SHIFT_ATTENDANCE_MODE_CHOICES,
-        method="shift_attendance_mode_filter",
-        label=_("Shift Status"),
-    )
-    registered_to_slot_with_capability = ChoiceFilter(
-        choices=[
-            (capability, capability_name)
-            for capability, capability_name in SHIFT_USER_CAPABILITY_CHOICES.items()
-        ],
-        method="registered_to_slot_with_capability_filter",
-        label=_("Is registered to a slot that requires a qualification"),
-    )
-    has_capability = ChoiceFilter(
-        choices=[
-            (capability, capability_name)
-            for capability, capability_name in SHIFT_USER_CAPABILITY_CHOICES.items()
-        ],
-        method="has_capability_filter",
-        label=_("Has qualification"),
-    )
-    not_has_capability = ChoiceFilter(
-        choices=[
-            (capability, capability_name)
-            for capability, capability_name in SHIFT_USER_CAPABILITY_CHOICES.items()
-        ],
-        method="not_has_capability_filter",
-        label=_("Does not have qualification"),
-    )
     has_tapir_account = BooleanFilter(
         method="has_tapir_account_filter", label="Has a Tapir account"
-    )
-    # Théo 17.09.21 : It would be nicer to get the values from the DB, but that raises exceptions
-    # when creating a brand new docker instance, because the corresponding table doesn't exist yet.
-    abcd_week = ChoiceFilter(
-        choices=[("A", "A"), ("B", "B"), ("C", "C"), ("D", "D")],
-        method="abcd_week_filter",
-        label=_("ABCD Week"),
     )
     has_unpaid_shares = BooleanFilter(
         method="has_unpaid_shares_filter", label="Has unpaid shares"
     )
-
     display_name = CharFilter(
         method="display_name_filter", label=_("Name or member ID")
     )
@@ -443,41 +402,10 @@ class ShareOwnerFilter(django_filters.FilterSet):
     def status_filter(self, queryset: ShareOwner.ShareOwnerQuerySet, name, value: str):
         return queryset.with_status(value)
 
-    def shift_attendance_mode_filter(
-        self, queryset: ShareOwner.ShareOwnerQuerySet, name, value: str
-    ):
-        return queryset.filter(
-            user__in=TapirUser.objects.with_shift_attendance_mode(value)
-        )
-
-    def registered_to_slot_with_capability_filter(
-        self, queryset: ShareOwner.ShareOwnerQuerySet, name, value: str
-    ):
-        return queryset.filter(
-            user__in=TapirUser.objects.registered_to_shift_slot_with_capability(value)
-        )
-
-    def has_capability_filter(
-        self, queryset: ShareOwner.ShareOwnerQuerySet, name, value: str
-    ):
-        return queryset.filter(user__in=TapirUser.objects.has_capability(value))
-
-    def not_has_capability_filter(
-        self, queryset: ShareOwner.ShareOwnerQuerySet, name, value: str
-    ):
-        return queryset.exclude(user__in=TapirUser.objects.has_capability(value))
-
     def has_tapir_account_filter(
         self, queryset: ShareOwner.ShareOwnerQuerySet, name, value: bool
     ):
         return queryset.exclude(user__isnull=value)
-
-    def abcd_week_filter(
-        self, queryset: ShareOwner.ShareOwnerQuerySet, name, value: str
-    ):
-        return queryset.filter(
-            user__shift_attendance_templates__slot_template__shift_template__group__name=value
-        )
 
     def has_unpaid_shares_filter(
         self, queryset: ShareOwner.ShareOwnerQuerySet, name, value: bool
@@ -500,8 +428,6 @@ class ShareOwnerListView(
     template_name = "coop/shareowner_list.html"
     permission_required = "coop.manage"
 
-    filterset_class = ShareOwnerFilter
-
     export_formats = ["csv", "json"]
 
     def get(self, request, *args, **kwargs):
@@ -512,6 +438,18 @@ class ShareOwnerListView(
                 self.get_table_data().first().get_absolute_url()
             )
         return response
+
+    def get_filterset_class(self):
+        mixins = [ShareOwnerBaseFilter]
+
+        if apps.is_installed("tapir.shifts"):
+            mixins.append(tapir.shifts.views.ShareOwnerFilterWithShiftsMixin)
+
+        return type(
+            "CustomShareOwnerFilter",
+            tuple(mixins),
+            {},
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -665,16 +603,22 @@ class WelcomeDeskShareOwnerView(PermissionRequiredMixin, generic.DetailView):
         if context_data["missing_account"]:
             return context_data
 
+        if apps.is_installed("tapir.shifts"):
+            context_data = self.update_context_data_shifts(context_data)
+
+        return context_data
+
+    def update_context_data_shifts(self, context_data):
+        share_owner: ShareOwner = context_data["share_owner"]
         context_data[
             "shift_balance_not_ok"
         ] = not share_owner.user.shift_user_data.is_balance_ok()
 
         context_data["must_register_to_a_shift"] = (
             share_owner.user.shift_user_data.attendance_mode
-            == ShiftAttendanceMode.REGULAR
-            and not ShiftAttendanceTemplate.objects.filter(
+            == tapir.shifts.models.ShiftAttendanceMode.REGULAR
+            and not tapir.shifts.models.ShiftAttendanceTemplate.objects.filter(
                 user=share_owner.user
             ).exists()
         )
-
         return context_data

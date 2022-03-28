@@ -3,14 +3,12 @@
 {% load django_bootstrap5 %}
 {% load static %}
 {% load i18n %}
-{% load shifts %}
 {% load coop %}
 {% load log %}
 {% load accounts %}
 
 {% block head %}
     {{ block.super }}
-    <link rel="stylesheet" href="{% static "shifts/css/shifts.css" %}">
     <link rel="stylesheet" href="{% static "accounts/css/user_detail.css" %}">
 {% endblock %}
 
